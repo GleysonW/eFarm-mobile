@@ -479,7 +479,7 @@ const RegistroScreen = () => {
       >
         <Picker.Item label="Insumos" value="Insumos" />
         <Picker.Item label="Transporte" value="Transporte" />
-        <Picker.Item label="Vendas" value="Educação" />
+        <Picker.Item label="Vendas" value="Vendas" />
         <Picker.Item label="Outro" value="Outro" />
       </Picker>
       <TextInput style={styles.input} placeholder="Valor" keyboardType="numeric" value={valor} onChangeText={setValor} />
