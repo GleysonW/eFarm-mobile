@@ -1,12 +1,14 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useState, useEffect } from 'react';
-import { LineChart, BarChart, PieChart } from 'react-native-chart-kit';
+import { LineChart, BarChart } from 'react-native-chart-kit';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Table, Row, Rows } from 'react-native-table-component';
-import { View, Text, Dimensions, Image, FlatList, Button, ScrollView, ActivityIndicator, StyleSheet, TextInput, TouchableOpacity, Alert, Modal } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { View, Text, Dimensions, Image, Button, ScrollView, ActivityIndicator, StyleSheet, TextInput, TouchableOpacity, Alert, Modal } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { DadosProvider, useDados } from './GastoContext';
+import { DadosProvider, useDados } from './DadosContext';
 import axios from 'axios';
 
 const API_URL_GASTOS = 'http://10.0.2.2:5500/api/gastos';
@@ -258,6 +260,8 @@ const RegistroScreen = () => {
   const [editingLucro, setEditingLucro] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [isGasto, setIsGasto] = useState(true);
+  const [date, setDate] = useState(new Date());
+  const [showPicker, setShowPicker] = useState(false);
 
   const fetchGastos = async () => {
     try {
@@ -369,6 +373,19 @@ const RegistroScreen = () => {
     setModalVisible(false);
   };
 
+  const formatDateToBR = (date) => {
+    return `${date.getDate().toString().padStart(2, '0')}/${
+      (date.getMonth() + 1).toString().padStart(2, '0')
+    }/${date.getFullYear()}`;
+  };
+
+  const onChange = (event, selectedDate) => {
+    const currentDate = selectedDate || date;
+    setShowPicker(false);
+    setDate(currentDate);
+    setData(formatDateToBR(currentDate)); // Atualiza a data com o formato brasileiro
+  };
+
   const totalGastos = gastos.reduce((total, item) => total + parseFloat(item.valor), 0);
   const totalLucros = lucros.reduce((total, item) => total + parseFloat(item.valor), 0);
   const saldoAtual = saldoInicial - totalGastos + totalLucros;
@@ -376,7 +393,6 @@ const RegistroScreen = () => {
 
   const saldoTableHead = ['Descrição', 'Valor'];
   const saldoTableData = [
-    ['Saldo Inicial', `$${saldoInicial.toFixed(2)}`],
     ['Saldo Atual', <Text style={saldoAtualStyle}>${saldoAtual.toFixed(2)}</Text>],
   ];
 
@@ -433,17 +449,6 @@ const RegistroScreen = () => {
       <View style={styles.container}>
         <Text style={styles.title}>Registro de Gastos e Lucros</Text>
 
-        <View style={styles.saldoContainer}>
-          <Text style={styles.saldoLabel}>Saldo Inicial:</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Digite o saldo inicial"
-            keyboardType="numeric"
-            value={saldoInicial.toString()}
-            onChangeText={text => setSaldoInicial(parseFloat(text) || 0)}
-          />
-        </View>
-
         <View style={styles.tableContainer}>
           <Table borderStyle={{ borderWidth: 1, borderColor: '#ccc' }}>
             <Row data={saldoTableHead} style={styles.header} textStyle={styles.headerText} />
@@ -453,24 +458,60 @@ const RegistroScreen = () => {
           </Table>
         </View>
 
+        <View style={styles.buttonContainer}>
         <Button title="Adicionar Gasto" onPress={() => { setIsGasto(true); setModalVisible(true); }} />
         <Button title="Adicionar Lucro" onPress={() => { setIsGasto(false); setModalVisible(true); }} />
+        </View>
 
         {renderGastosTable()}
         {renderLucrosTable()}
 
         <Modal visible={modalVisible} animationType="slide" transparent={true}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-              <Text style={styles.modalTitle}>{isGasto ? (editingGasto ? "Editar Gasto" : "Adicionar Gasto") : (editingLucro ? "Editar Lucro" : "Adicionar Lucro")}</Text>
-              <TextInput style={styles.input} placeholder="Tipo" value={tipo} onChangeText={setTipo} />
-              <TextInput style={styles.input} placeholder="Valor" keyboardType="numeric" value={valor} onChangeText={setValor} />
-              <TextInput style={styles.input} placeholder="Data (YYYY-MM-DD)" value={data} onChangeText={setData} />
-              <Button title={isGasto ? (editingGasto ? "Atualizar Gasto" : "Adicionar Gasto") : (editingLucro ? "Atualizar Lucro" : "Adicionar Lucro")} onPress={isGasto ? (editingGasto ? updateGasto : addGasto) : (editingLucro ? updateLucro : addLucro)} />
-              <Button title="Cancelar" onPress={resetForm} />
-            </View>
-          </View>
-        </Modal>
+  <View style={styles.modalOverlay}>
+    <View style={styles.modalContainer}>
+      <Text style={styles.modalTitle}>{isGasto ? (editingGasto ? "Editar Gasto" : "Adicionar Gasto") : (editingLucro ? "Editar Lucro" : "Adicionar Lucro")}</Text>
+            {/* Input para o tipo com Picker */}
+            <Text>Tipo:</Text>
+      <Picker
+        selectedValue={tipo}
+        style={styles.input}
+        onValueChange={(itemValue) => setTipo(itemValue)}
+      >
+        <Picker.Item label="Insumos" value="Insumos" />
+        <Picker.Item label="Transporte" value="Transporte" />
+        <Picker.Item label="Vendas" value="Educação" />
+        <Picker.Item label="Outro" value="Outro" />
+      </Picker>
+      <TextInput style={styles.input} placeholder="Valor" keyboardType="numeric" value={valor} onChangeText={setValor} />
+      
+      {/* Botão para abrir o DatePicker */}
+      <TouchableOpacity onPress={() => setShowPicker(true)}>
+        <TextInput
+          style={styles.input}
+          placeholder="Data"
+          value={data} // Mostra a data formatada
+          editable={false} // Impede edição direta
+        />
+      </TouchableOpacity>
+      
+      {/* Mostra o DatePicker se showPicker estiver true */}
+      {showPicker && (
+        <DateTimePicker
+          value={date}
+          mode="date"
+          display="default"
+          onChange={onChange}
+        />
+      )}
+
+      <Button 
+        title={editingGasto || editingLucro ? "Salvar" : "Adicionar"}
+        onPress={isGasto ? (editingGasto ? updateGasto : addGasto) : (editingLucro ? updateLucro : addLucro)}
+      />
+      <Button title="Cancelar" onPress={resetForm} />
+    </View>
+  </View>
+</Modal>
       </View>
     </ScrollView>
   );
@@ -527,6 +568,12 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
+  },
+  buttonContainer: {
+    height: 40,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
   },
   modalOverlay: {
     flex: 1,
