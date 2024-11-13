@@ -1,12 +1,12 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useState, useEffect } from 'react';
-import { LineChart, BarChart } from 'react-native-chart-kit';
+import { LineChart, BarChart, PieChart } from 'react-native-chart-kit';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Table, Row, Rows } from 'react-native-table-component';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { View, Text, Dimensions, Image, Button, ScrollView, ActivityIndicator, StyleSheet, TextInput, TouchableOpacity, Alert, Modal } from 'react-native';
+import { View, Text, Dimensions, Image, Button, FlatList, ScrollView, ActivityIndicator, StyleSheet, TextInput, TouchableOpacity, Alert, Modal } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { DadosProvider, useDados } from './DadosContext';
 import axios from 'axios';
@@ -16,13 +16,144 @@ const API_URL_LUCROS = 'http://10.0.2.2:5500/api/lucros';
 const logo = require('./assets/logo.png');
 
 function HomeScreen() {
+  const { gastos, lucros, updateGastos, updateLucros } = useDados();
+  const [saldoInicial, setSaldoInicial] = useState(0);
+
+  const totalGastos = (gastos || []).reduce((total, item) => total + parseFloat(item.valor), 0);
+  const totalLucros = (lucros || []).reduce((total, item) => total + parseFloat(item.valor), 0);
+  const saldoAtual = saldoInicial - totalGastos + totalLucros;
+  const saldoAtualStyle = saldoAtual >= 0 ? stylesHOME.saldoPositivo : stylesHOME.saldoNegativo;
+
+  const fetchGastos = async () => {
+    try {
+      const response = await axios.get(API_URL_GASTOS);
+      updateGastos(response.data.gastos);
+    } catch (error) {
+      console.error('Erro ao buscar gastos:', error.response ? error.response.data : error.message);
+    }
+  };
+
+  const fetchLucros = async () => {
+    try {
+      const response = await axios.get(API_URL_LUCROS);
+      updateLucros(response.data.lucros);
+    } catch (error) {
+      console.error('Erro ao buscar lucros:', error.response ? error.response.data : error.message);
+    }
+  };
+
+  useEffect(() => {
+    fetchGastos();
+    fetchLucros();
+  }, []);
+
+  return (
+    <View style={stylesHOME.container}>
+      <Text style={stylesHOME.titulo}>Bem vindo ao</Text>
+      <Image source={logo} style={stylesHOME.logo2} />
+      <Text style={stylesHOME.titulo}>Resumo Financeiro</Text>
+
+      <View style={stylesHOME.saldoContainer}>
+        <Text style={stylesHOME.saldoLabel}>Saldo Atual:</Text>
+        <Text style={[stylesHOME.saldoValor, saldoAtualStyle]}>R$ {saldoAtual.toFixed(2)}</Text>
+      </View>
+
+      <View style={stylesHOME.section}>
+        <Text style={stylesHOME.sectionTitle}>Últimos Gastos</Text>
+        <FlatList
+          data={gastos.slice(0, 3)}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <View style={stylesHOME.listItem}>
+              <Text>{item.tipo} - R$ {item.valor} ({item.data})</Text>
+            </View>
+          )}
+        />
+      </View>
+
+      <View style={stylesHOME.section}>
+        <Text style={stylesHOME.sectionTitle}>Últimos Lucros</Text>
+        <FlatList
+          data={lucros.slice(0, 3)}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <View style={stylesHOME.listItem}>
+              <Text>{item.tipo} - R$ {item.valor} ({item.data})</Text>
+            </View>
+          )}
+        />
+      </View>
+    </View>
+  );
 }
+
+const stylesHOME = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: '#F5F5F5',
+  },
+  logo2: {
+    width: 300,
+    height: 150,
+    alignSelf: 'center',
+    marginBottom: 10,
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  titulo: {
+    fontSize: 30,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  saldoContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    padding: 10,
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+  },
+  saldoLabel: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  saldoValor: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  saldoPositivo: {
+    color: 'green',
+  },
+  saldoNegativo: {
+    color: 'red',
+  },
+  section: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  listItem: {
+    padding: 10,
+    backgroundColor: '#FFF',
+    marginBottom: 5,
+    borderRadius: 5,
+  },
+});
 
 function GraficosScreen() {
   const { gastos, lucros } = useDados();
   const [loading, setLoading] = useState(true);
   const [lineChartData, setLineChartData] = useState({
-    labels: [],
+    labels: [], // O eixo X será vazio, sem mostrar a data
     datasets: [
       {
         data: [],
@@ -30,7 +161,7 @@ function GraficosScreen() {
     ],
   });
   const [barChartData, setBarChartData] = useState({
-    labels: [],
+    labels: [], // Usado para os tipos de gasto, por exemplo
     datasets: [
       {
         data: [],
@@ -62,7 +193,7 @@ function GraficosScreen() {
           }, []);
   
           setLineChartData({
-            labels: datasGastos,
+            labels: [], // Ocultar as labels de data
             datasets: [
               {
                 data: somaAcumuladaGastos,
@@ -96,7 +227,7 @@ function GraficosScreen() {
           }, []);
 
           setLucroChartData({
-            labels: datasLucros,
+            labels: [], // Ocultar as labels de data
             datasets: [
               {
                 data: somaAcumuladaLucros,
@@ -462,21 +593,22 @@ const RegistroScreen = () => {
         <Button title="Adicionar Gasto" onPress={() => { setIsGasto(true); setModalVisible(true); }} />
         <Button title="Adicionar Lucro" onPress={() => { setIsGasto(false); setModalVisible(true); }} />
         </View>
-
+        <Text style={styles.text}>Gastos</Text>
         {renderGastosTable()}
+        <Text style={styles.text}>Lucros</Text>
         {renderLucrosTable()}
 
         <Modal visible={modalVisible} animationType="slide" transparent={true}>
   <View style={styles.modalOverlay}>
     <View style={styles.modalContainer}>
       <Text style={styles.modalTitle}>{isGasto ? (editingGasto ? "Editar Gasto" : "Adicionar Gasto") : (editingLucro ? "Editar Lucro" : "Adicionar Lucro")}</Text>
-            {/* Input para o tipo com Picker */}
             <Text>Tipo:</Text>
       <Picker
         selectedValue={tipo}
         style={styles.input}
         onValueChange={(itemValue) => setTipo(itemValue)}
       >
+        <Picker.Item label="Escolha o tipo" value="" />
         <Picker.Item label="Insumos" value="Insumos" />
         <Picker.Item label="Transporte" value="Transporte" />
         <Picker.Item label="Vendas" value="Vendas" />
@@ -484,17 +616,15 @@ const RegistroScreen = () => {
       </Picker>
       <TextInput style={styles.input} placeholder="Valor" keyboardType="numeric" value={valor} onChangeText={setValor} />
       
-      {/* Botão para abrir o DatePicker */}
       <TouchableOpacity onPress={() => setShowPicker(true)}>
         <TextInput
           style={styles.input}
           placeholder="Data"
-          value={data} // Mostra a data formatada
-          editable={false} // Impede edição direta
+          value={data}
+          editable={false}
         />
       </TouchableOpacity>
       
-      {/* Mostra o DatePicker se showPicker estiver true */}
       {showPicker && (
         <DateTimePicker
           value={date}
@@ -559,6 +689,10 @@ const styles = StyleSheet.create({
   cellText: {
     textAlign: 'center',
     padding: 10,
+  },
+  text: {
+    padding:  10,
+    fontSize: 15,
   },
   button: {
     backgroundColor: '#007BFF',
